@@ -1,0 +1,109 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "allwinner,sun8i-h3";
+
+	fragment@0 {
+		target = <&spi0>;
+		__overlay__ {
+			status = "okay";
+
+			spidev@0{
+				status = "disabled";
+			};
+
+			spidev@1{
+				status = "disabled";
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <&pio>;
+		__overlay__ {
+			// Set up pins
+			ili9486_pins: ili9486_pins {
+				allwinner,pins = "PA2", "PC7"; // Add DC/RS nad RST pins here
+				allwinner,function = "gpio_in";
+			};
+		ads7846_pins: ads7846_pins {
+				pins= "PA1";
+				function = "irq";
+     			 };
+		};
+	};
+
+	fragment@2 {
+		target = <&spi0>;
+		__overlay__ {
+			/* needed to avoid dtc warning */
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			ili9486: ili9486@0{
+				compatible = "ilitek,ili9486";
+				reg = <0>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&ili9486_pins>;
+
+				spi-max-frequency = <16000000>;
+				txbuflen = <32768>;
+				rotate = <90>;
+				bgr = <0>;
+				fps = <30>;
+				buswidth = <8>;
+				regwidth = <16>;
+				// Select pins: 1st number = pos. of letter in the alphabet - 1
+				//              2nd number = pin number
+				//              3rd number = DON'T CHANGE! (1 = ACTIVE_LOW, 0 = ACTIVE_HIGH)
+				// Example: PA2 = <&pio 0 2 1>
+				//          PC7 = <&pio 2 7 0>
+				reset-gpios = <&pio 0 2 1>; // RST pin
+				dc-gpios = <&pio 2 7 0>; // DC/RS pin
+				debug = <0>;
+
+				init = <0x10000b0 0x00
+					0x1000011
+					0x20000ff
+					0x100003a 0x55
+					0x1000036 0x28
+					0x10000c2 0x44
+					0x10000c5 0x00 0x00 0x00 0x00
+					0x10000e0 0x0f 0x1f 0x1c 0x0c 0x0f 0x08 0x48 0x98 0x37 0x0a 0x13 0x04 0x11 0x0d 0x00
+					0x10000e1 0x0f 0x32 0x2e 0x0b 0x0d 0x05 0x47 0x75 0x37 0x06 0x10 0x03 0x24 0x20 0x00
+					0x10000e2 0x0f 0x32 0x2e 0x0b 0x0d 0x05 0x47 0x75 0x37 0x06 0x10 0x03 0x24 0x20 0x00
+					0x1000036 0x28
+					0x1000011
+					0x1000029>;
+			};
+			tft35a_ts: tft35a_ts@1 {
+				compatible = "ti,ads7846";
+				reg = <1>;
+				status = "okay";
+				pinctrl-names = "default";
+				pinctrl-0 = <&ads7846_pins>;
+				spi-max-frequency = <2000000>;
+				interrupts = <0 1 2>; /* PA1 IRQ_TYPE_EDGE_FALLING */
+				interrupt-parent = <&pio>;
+				pendown-gpio = <&pio 0 1 0>; /* PA1 */
+				ti,x-min = /bits/ 16 <0>;
+				ti,y-min = /bits/ 16 <0>;
+				ti,x-max = /bits/ 16 <0x0FFF>;
+				ti,y-max = /bits/ 16 <0x0FFF>;
+				ti,pressure-min = /bits/ 16 <0>;
+				ti,pressure-max = /bits/ 16 <0xFFFF>;
+				ti,x-plate-ohms = /bits/ 16 <400>;
+			};
+		};
+	};
+	__overrides__ {
+		speed = <&ili9486>,"spi-max-frquency:0";
+		txbuflen = <&ili9486>,"txbuflen:0";
+		rotate = <&ili9486>,"rotate:0";
+		fps = <&ili9486>,"fps:0";
+		bgr = <&ili9486>,"bgr:0";
+		debug = <&ili9486>,"debug:0";
+		swapxy = <&tft35a_ts>,"ti,swap-xy?";
+	};	
+};
